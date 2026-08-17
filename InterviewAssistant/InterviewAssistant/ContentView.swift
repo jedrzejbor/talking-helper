@@ -12,6 +12,7 @@ struct ContentView: View {
     @StateObject private var hotkeyManager = HotkeyManager()
     @StateObject private var microphoneService = MicrophoneCaptureService()
     @StateObject private var screenCaptureService = ScreenCaptureDiagnosticService()
+    @StateObject private var codeCaptureService = CodeCaptureService()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -30,14 +31,20 @@ struct ContentView: View {
                 overlaySection
                 microphoneSection
                 screenCaptureSection
+                codeCaptureSection
             }
         }
         .padding(24)
-        .frame(minWidth: 620, minHeight: 520)
+        .frame(minWidth: 680, minHeight: 720)
         .onAppear {
-            hotkeyManager.registerToggleOverlayHotkey {
-                overlayController.toggle()
-            }
+            hotkeyManager.registerDefaultHotkeys(
+                toggleOverlay: {
+                    overlayController.toggle()
+                },
+                captureCode: {
+                    codeCaptureService.captureCode()
+                }
+            )
         }
         .onDisappear {
             microphoneService.stop()
@@ -104,11 +111,22 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
 
             HStack {
+                Button("Popros o dostep") {
+                    screenCaptureService.requestPermission()
+                }
+                .buttonStyle(.bordered)
+                .disabled(screenCaptureService.state == .checking)
+
                 Button("Sprawdz dostep do ekranu") {
                     screenCaptureService.checkAccess()
                 }
                 .buttonStyle(.bordered)
                 .disabled(screenCaptureService.state == .checking)
+
+                Button("Otworz ustawienia") {
+                    PrivacySettingsOpener.openScreenCaptureSettings()
+                }
+                .buttonStyle(.bordered)
 
                 Text(screenCaptureService.state.label)
                     .foregroundStyle(.secondary)
@@ -119,6 +137,58 @@ struct ContentView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if screenCaptureService.state == .permissionMissing {
+                Text("Wlacz przelacznik przy InterviewAssistant w ustawieniach prywatnosci. Jesli jest juz wlaczony, usun wpis minusem, uruchom aplikacje ponownie i kliknij Popros o dostep.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if case .failed = screenCaptureService.state {
+                Text("ScreenCaptureKit zwrocil blad mimo zgody. Zamknij aplikacje, uruchom ponownie z Xcode i sprawdz, czy w Signing & Capabilities ustawiony jest staly Team.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var codeCaptureSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Przechwytywanie kodu")
+                .font(.headline)
+
+            Text("Skrot Cmd + Shift + C pobiera tekst ze schowka. Jesli schowek jest pusty, aplikacja robi OCR glownego ekranu.")
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Button("Przechwyc kod") {
+                    codeCaptureService.captureCode()
+                }
+                .buttonStyle(.bordered)
+                .disabled(codeCaptureService.state == .runningOCR)
+
+                Button("Wyczysc") {
+                    codeCaptureService.clear()
+                }
+                .buttonStyle(.bordered)
+
+                Text(codeCaptureService.state.label)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !codeCaptureService.capturedText.isEmpty {
+                ScrollView {
+                    Text(codeCaptureService.capturedText)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .padding(10)
+                }
+                .frame(height: 140)
+                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
     }

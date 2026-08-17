@@ -7,12 +7,14 @@
 
 import Foundation
 import ScreenCaptureKit
+import CoreGraphics
 
 @MainActor
 final class ScreenCaptureDiagnosticService: ObservableObject {
     enum DiagnosticState: Equatable {
         case idle
         case checking
+        case permissionMissing
         case ready(Summary)
         case failed(String)
 
@@ -22,6 +24,8 @@ final class ScreenCaptureDiagnosticService: ObservableObject {
                 "ScreenCaptureKit nie sprawdzony"
             case .checking:
                 "Sprawdzanie zrodel przechwytywania"
+            case .permissionMissing:
+                "Brak zgody Screen Recording"
             case .ready:
                 "ScreenCaptureKit ma dostep"
             case .failed(let message):
@@ -47,10 +51,31 @@ final class ScreenCaptureDiagnosticService: ObservableObject {
 
     @Published private(set) var state: DiagnosticState = .idle
 
+    var hasScreenCapturePermission: Bool {
+        CGPreflightScreenCaptureAccess()
+    }
+
+    func requestPermission() {
+        state = .checking
+
+        Task.detached(priority: .userInitiated) {
+            let granted = CGRequestScreenCaptureAccess()
+
+            await MainActor.run {
+                self.state = granted ? .idle : .permissionMissing
+            }
+        }
+    }
+
     func checkAccess() {
         state = .checking
 
         Task {
+            guard CGPreflightScreenCaptureAccess() else {
+                state = .permissionMissing
+                return
+            }
+
             do {
                 let content = try await SCShareableContent.current
                 let appNames = content.applications

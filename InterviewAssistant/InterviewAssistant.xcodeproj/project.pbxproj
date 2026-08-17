@@ -399,6 +399,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"InterviewAssistant/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSMultipleInstancesProhibited = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aplikacja potrzebuje mikrofonu do testu transkrypcji wypowiedzi uzytkownika podczas rozmowy.";
 				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Aplikacja potrzebuje dostepu do ekranu, aby testowac przechwytywanie okien, kodu i zrodel rozmowy.";
@@ -426,6 +427,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"InterviewAssistant/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSMultipleInstancesProhibited = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aplikacja potrzebuje mikrofonu do testu transkrypcji wypowiedzi uzytkownika podczas rozmowy.";
 				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Aplikacja potrzebuje dostepu do ekranu, aby testowac przechwytywanie okien, kodu i zrodel rozmowy.";

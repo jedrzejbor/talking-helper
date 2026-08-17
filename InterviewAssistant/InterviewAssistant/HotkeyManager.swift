@@ -11,38 +11,135 @@ import Foundation
 final class HotkeyManager: ObservableObject {
     enum RegistrationState: Equatable {
         case idle
-        case registered(String)
-        case failed(OSStatus)
+        case registered([String])
+        case failed(String)
 
         var label: String {
             switch self {
             case .idle:
-                "Skrot nieaktywny"
-            case .registered(let shortcut):
-                "Skrot aktywny: \(shortcut)"
-            case .failed(let status):
-                "Nie udalo sie zarejestrowac skrotu: \(status)"
+                "Skroty nieaktywne"
+            case .registered(let shortcuts):
+                "Skroty aktywne: \(shortcuts.joined(separator: ", "))"
+            case .failed(let message):
+                "Nie udalo sie zarejestrowac skrotu: \(message)"
             }
         }
     }
 
     @Published private(set) var state: RegistrationState = .idle
 
-    private var hotKeyRef: EventHotKeyRef?
+    private var hotKeyRefs: [UInt32: EventHotKeyRef] = [:]
     private var eventHandlerRef: EventHandlerRef?
-    private var action: (@MainActor () -> Void)?
+    private var actions: [UInt32: @MainActor () -> Void] = [:]
+    private var shortcutLabels: [UInt32: String] = [:]
 
     deinit {
         unregister()
     }
 
-    func registerToggleOverlayHotkey(action: @escaping @MainActor () -> Void) {
-        guard hotKeyRef == nil else {
-            self.action = action
+    func registerDefaultHotkeys(
+        toggleOverlay: @escaping @MainActor () -> Void,
+        captureCode: @escaping @MainActor () -> Void
+    ) {
+        registerHotkey(
+            id: 1,
+            keyCode: UInt32(kVK_Space),
+            modifiers: UInt32(cmdKey | shiftKey),
+            label: "Cmd + Shift + Space",
+            action: toggleOverlay
+        )
+
+        registerHotkey(
+            id: 2,
+            keyCode: UInt32(kVK_ANSI_C),
+            modifiers: UInt32(cmdKey | shiftKey),
+            label: "Cmd + Shift + C",
+            action: captureCode
+        )
+    }
+
+    func registerHotkey(
+        id: UInt32,
+        keyCode: UInt32,
+        modifiers: UInt32,
+        label: String,
+        action: @escaping @MainActor () -> Void
+    ) {
+        installEventHandlerIfNeeded()
+        actions[id] = action
+
+        let hotKeyID = EventHotKeyID(
+            signature: OSType(fourCharacterCode: "IAHK"),
+            id: id
+        )
+
+        var hotKeyRef: EventHotKeyRef?
+        let hotKeyStatus = RegisterEventHotKey(
+            keyCode,
+            modifiers,
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotKeyRef
+        )
+
+        if hotKeyStatus == noErr, let hotKeyRef {
+            hotKeyRefs[id] = hotKeyRef
+            shortcutLabels[id] = label
+            state = .registered(shortcutLabels.keys.sorted().compactMap { shortcutLabels[$0] })
+        } else {
+            state = .failed("\(label), OSStatus \(hotKeyStatus)")
+        }
+    }
+
+    func unregister() {
+        for hotKeyRef in hotKeyRefs.values {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+
+        hotKeyRefs.removeAll()
+        actions.removeAll()
+        shortcutLabels.removeAll()
+
+        if let eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
+            self.eventHandlerRef = nil
+        }
+
+        state = .idle
+    }
+
+    private func handle(event: EventRef?) {
+        guard let event else {
             return
         }
 
-        self.action = action
+        var hotKeyID = EventHotKeyID()
+        let status = GetEventParameter(
+            event,
+            EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotKeyID
+        )
+
+        guard status == noErr else {
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            Task { @MainActor in
+                self?.actions[hotKeyID.id]?()
+            }
+        }
+    }
+
+    private func installEventHandlerIfNeeded() {
+        guard eventHandlerRef == nil else {
+            return
+        }
 
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
@@ -69,55 +166,8 @@ final class HotkeyManager: ObservableObject {
             &eventHandlerRef
         )
 
-        guard handlerStatus == noErr else {
-            state = .failed(handlerStatus)
-            return
-        }
-
-        let hotKeyID = EventHotKeyID(
-            signature: OSType(fourCharacterCode: "IAHK"),
-            id: 1
-        )
-
-        let hotKeyStatus = RegisterEventHotKey(
-            UInt32(kVK_Space),
-            UInt32(cmdKey | shiftKey),
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
-
-        if hotKeyStatus == noErr {
-            state = .registered("Cmd + Shift + Space")
-        } else {
-            state = .failed(hotKeyStatus)
-        }
-    }
-
-    func unregister() {
-        if let hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
-        }
-
-        if let eventHandlerRef {
-            RemoveEventHandler(eventHandlerRef)
-            self.eventHandlerRef = nil
-        }
-
-        state = .idle
-    }
-
-    private func handle(event: EventRef?) {
-        guard event != nil else {
-            return
-        }
-
-        DispatchQueue.main.async { [weak self] in
-            Task { @MainActor in
-                self?.action?()
-            }
+        if handlerStatus != noErr {
+            state = .failed("handler, OSStatus \(handlerStatus)")
         }
     }
 }
