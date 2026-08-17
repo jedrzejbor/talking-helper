@@ -333,7 +333,7 @@ Kryterium zaliczenia:
 - [ ] Projekt buduje sie lokalnie.
 - [ ] Dziala podstawowe okno SwiftUI.
 - [x] Dziala overlay `NSPanel`.
-- [ ] Dziala skrot pokaz/ukryj.
+- [x] Dziala skrot pokaz/ukryj.
 - [ ] Dziala wykrywanie uprawnien.
 - [ ] Dziala mikrofon i miernik poziomu.
 - [ ] Przetestowano screen share w Teams.
