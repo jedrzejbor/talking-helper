@@ -166,6 +166,8 @@ Onboarding musi jasno przeprowadzic uzytkownika przez nadawanie tych uprawnien.
 
 Cel: sprawdzic, czy najtrudniejsze elementy sa wykonalne przed budowaniem pelnego produktu.
 
+Szczegolowy plan utworzenia projektu, uruchamiania i testow znajduje sie w pliku `ETAP_0_START_PROJEKTU_I_TESTY.md`.
+
 Zadania:
 
 1. Utworzyc minimalna aplikacje macOS w SwiftUI.
