@@ -12,6 +12,10 @@ enum PrivacySettingsOpener {
         openSettings(urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
     }
 
+    static func openAccessibilitySettings() {
+        openSettings(urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+    }
+
     private static func openSettings(urlString: String) {
         guard let url = URL(string: urlString) else {
             return

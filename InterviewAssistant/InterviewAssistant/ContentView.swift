@@ -43,6 +43,9 @@ struct ContentView: View {
                 },
                 captureCode: {
                     codeCaptureService.captureCode()
+                },
+                captureCursorContext: {
+                    codeCaptureService.captureCursorContext()
                 }
             )
         }
@@ -160,12 +163,18 @@ struct ContentView: View {
             Text("Przechwytywanie kodu")
                 .font(.headline)
 
-            Text("Skrot Cmd + Shift + C pobiera tekst ze schowka. Jesli schowek jest pusty, aplikacja robi OCR glownego ekranu.")
+            Text("Cmd + Shift + C pobiera tekst ze schowka. Cmd + Shift + D probuje pobrac kontekst z miejsca kursora bez zaznaczania tekstu.")
                 .foregroundStyle(.secondary)
 
             HStack {
                 Button("Przechwyc kod") {
                     codeCaptureService.captureCode()
+                }
+                .buttonStyle(.bordered)
+                .disabled(codeCaptureService.state == .runningOCR)
+
+                Button("Kontekst kursora") {
+                    codeCaptureService.captureCursorContext()
                 }
                 .buttonStyle(.bordered)
                 .disabled(codeCaptureService.state == .runningOCR)
@@ -177,6 +186,20 @@ struct ContentView: View {
 
                 Text(codeCaptureService.state.label)
                     .foregroundStyle(.secondary)
+            }
+
+            if case .failed(let message) = codeCaptureService.state,
+               message.contains("Accessibility") {
+                HStack {
+                    Button("Otworz Accessibility") {
+                        PrivacySettingsOpener.openAccessibilitySettings()
+                    }
+                    .buttonStyle(.bordered)
+
+                    Text("Wlacz InterviewAssistant w Accessibility, zamknij aplikacje i uruchom ja ponownie.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if !codeCaptureService.capturedText.isEmpty {
