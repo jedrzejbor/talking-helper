@@ -332,7 +332,7 @@ Kryterium zaliczenia:
 - [ ] Utworzony projekt `InterviewAssistant` w Xcode.
 - [ ] Projekt buduje sie lokalnie.
 - [ ] Dziala podstawowe okno SwiftUI.
-- [ ] Dziala overlay `NSPanel`.
+- [x] Dziala overlay `NSPanel`.
 - [ ] Dziala skrot pokaz/ukryj.
 - [ ] Dziala wykrywanie uprawnien.
 - [ ] Dziala mikrofon i miernik poziomu.

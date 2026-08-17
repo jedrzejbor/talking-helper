@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var overlayController = OverlayPanelController()
+    @StateObject private var hotkeyManager = HotkeyManager()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -23,7 +24,7 @@ struct ContentView: View {
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Pierwszy test sprawdza, czy mozemy wyswietlic prywatny panel nad innymi aplikacjami.")
                     .foregroundStyle(.secondary)
 
@@ -36,9 +37,18 @@ struct ContentView: View {
                     Text(overlayController.isVisible ? "Overlay jest widoczny" : "Overlay jest ukryty")
                         .foregroundStyle(.secondary)
                 }
+
+                Text(hotkeyManager.state.label)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(24)
         .frame(minWidth: 520, minHeight: 260)
+        .onAppear {
+            hotkeyManager.registerToggleOverlayHotkey {
+                overlayController.toggle()
+            }
+        }
     }
 }
