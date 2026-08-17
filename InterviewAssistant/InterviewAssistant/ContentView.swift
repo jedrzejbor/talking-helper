@@ -11,6 +11,7 @@ struct ContentView: View {
     @StateObject private var overlayController = OverlayPanelController()
     @StateObject private var hotkeyManager = HotkeyManager()
     @StateObject private var microphoneService = MicrophoneCaptureService()
+    @StateObject private var screenCaptureService = ScreenCaptureDiagnosticService()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -28,10 +29,11 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 16) {
                 overlaySection
                 microphoneSection
+                screenCaptureSection
             }
         }
         .padding(24)
-        .frame(minWidth: 560, minHeight: 380)
+        .frame(minWidth: 620, minHeight: 520)
         .onAppear {
             hotkeyManager.registerToggleOverlayHotkey {
                 overlayController.toggle()
@@ -90,6 +92,34 @@ struct ContentView: View {
             Text(String(format: "Poziom: %.1f dB", microphoneService.decibels))
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var screenCaptureSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("ScreenCaptureKit")
+                .font(.headline)
+
+            Text("Ten test sprawdza, czy aplikacja widzi ekrany, okna i aplikacje jako zrodla przechwytywania.")
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Button("Sprawdz dostep do ekranu") {
+                    screenCaptureService.checkAccess()
+                }
+                .buttonStyle(.bordered)
+                .disabled(screenCaptureService.state == .checking)
+
+                Text(screenCaptureService.state.label)
+                    .foregroundStyle(.secondary)
+            }
+
+            if case .ready(let summary) = screenCaptureService.state {
+                Text(summary.details)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }

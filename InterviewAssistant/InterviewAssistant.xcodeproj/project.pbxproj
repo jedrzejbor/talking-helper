@@ -401,6 +401,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aplikacja potrzebuje mikrofonu do testu transkrypcji wypowiedzi uzytkownika podczas rozmowy.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Aplikacja potrzebuje dostepu do ekranu, aby testowac przechwytywanie okien, kodu i zrodel rozmowy.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -427,6 +428,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aplikacja potrzebuje mikrofonu do testu transkrypcji wypowiedzi uzytkownika podczas rozmowy.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Aplikacja potrzebuje dostepu do ekranu, aby testowac przechwytywanie okien, kodu i zrodel rozmowy.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

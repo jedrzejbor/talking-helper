@@ -335,7 +335,7 @@ Kryterium zaliczenia:
 - [x] Dziala overlay `NSPanel`.
 - [x] Dziala skrot pokaz/ukryj.
 - [ ] Dziala wykrywanie uprawnien.
-- [ ] Dziala mikrofon i miernik poziomu.
+- [x] Dziala mikrofon i miernik poziomu.
 - [ ] Przetestowano screen share w Teams.
 - [ ] Przetestowano screen share w Google Meet.
 - [ ] Przetestowano przechwytywanie audio rozmowcy.
