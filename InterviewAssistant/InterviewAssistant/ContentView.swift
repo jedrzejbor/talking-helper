@@ -12,38 +12,44 @@ struct ContentView: View {
     @StateObject private var hotkeyManager = HotkeyManager()
     @StateObject private var microphoneService = MicrophoneCaptureService()
     @StateObject private var systemAudioService = SystemAudioCaptureService()
+    @StateObject private var transcriptionService = AudioTranscriptionService()
     @StateObject private var screenCaptureService = ScreenCaptureDiagnosticService()
     @StateObject private var codeCaptureService = CodeCaptureService()
     @StateObject private var suggestionService = OpenAISuggestionService()
     @State private var apiKey = ""
     @State private var modelName = "gpt-5.6"
+    @State private var transcriptionModelName = "gpt-4o-mini-transcribe"
     @State private var interviewQuestion = ""
     @State private var keyStatus = "Klucz API niezaladowany"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Interview Assistant")
-                    .font(.largeTitle.weight(.semibold))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Interview Assistant")
+                        .font(.largeTitle.weight(.semibold))
 
-                Text("Etap 0: test overlayu")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
+                    Text("Etap 0: testy techniczne")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 16) {
+                    overlaySection
+                    microphoneSection
+                    systemAudioSection
+                    transcriptionSection
+                    screenCaptureSection
+                    codeCaptureSection
+                    aiSection
+                }
             }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 16) {
-                overlaySection
-                microphoneSection
-                systemAudioSection
-                screenCaptureSection
-                codeCaptureSection
-                aiSection
-            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(24)
-        .frame(minWidth: 760, minHeight: 900)
+        .frame(minWidth: 760, minHeight: 700)
         .onAppear {
             hotkeyManager.registerDefaultHotkeys(
                 toggleOverlay: {
@@ -61,6 +67,7 @@ struct ContentView: View {
         .onDisappear {
             microphoneService.stop()
             systemAudioService.stop()
+            transcriptionService.cancel()
         }
         .onChange(of: suggestionService.answer) { _, answer in
             guard !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -82,6 +89,18 @@ struct ContentView: View {
                     show: overlayController.isVisible
                 )
             }
+        }
+        .onChange(of: transcriptionService.transcript) { _, transcript in
+            guard !transcript.isEmpty else {
+                return
+            }
+
+            interviewQuestion = transcript
+            overlayController.updateContent(
+                title: "Transkrypcja testowa",
+                body: transcript,
+                status: "Audio zamienione na tekst"
+            )
         }
     }
 
@@ -174,6 +193,68 @@ struct ContentView: View {
                 Text("Wlacz InterviewAssistant w Nagrywanie ekranu i dzwieku systemowego, zamknij aplikacje i uruchom ja ponownie.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var transcriptionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Transkrypcja audio")
+                .font(.headline)
+
+            Text("Nagraj do 10 sekund z mikrofonu. Po zatrzymaniu probka zostanie wyslana do OpenAI i wpisana jako pytanie rozmowcy.")
+                .foregroundStyle(.secondary)
+
+            HStack {
+                if transcriptionService.state == .recording {
+                    Button("Zatrzymaj i transkrybuj") {
+                        transcriptionService.stopAndTranscribe(
+                            apiKey: apiKey,
+                            model: transcriptionModelName
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                } else {
+                    Button("Nagraj probke") {
+                        microphoneService.stop()
+                        transcriptionService.startRecording(
+                            apiKey: apiKey,
+                            model: transcriptionModelName
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(transcriptionService.isBusy)
+                }
+
+                TextField("Model transkrypcji", text: $transcriptionModelName)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 220)
+
+                Text(transcriptionService.state.label)
+                    .foregroundStyle(.secondary)
+            }
+
+            if transcriptionService.state == .recording {
+                ProgressView(value: Double(transcriptionService.recordingSeconds), total: 10)
+                    .progressViewStyle(.linear)
+
+                Text("Nagrywanie: \(transcriptionService.recordingSeconds) / 10 s")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let duration = transcriptionService.requestDuration {
+                Text(String(format: "Czas odpowiedzi API: %.2f s", duration))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !transcriptionService.transcript.isEmpty {
+                Text(transcriptionService.transcript)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                    .padding(10)
+                    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
     }
