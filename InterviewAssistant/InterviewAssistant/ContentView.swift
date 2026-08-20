@@ -59,6 +59,27 @@ struct ContentView: View {
         .onDisappear {
             microphoneService.stop()
         }
+        .onChange(of: suggestionService.answer) { _, answer in
+            guard !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return
+            }
+
+            overlayController.updateContent(
+                title: "Podpowiedz AI",
+                body: answer,
+                status: "Ostatnia odpowiedz AI"
+            )
+        }
+        .onChange(of: suggestionService.state) { _, state in
+            if state == .loading {
+                overlayController.updateContent(
+                    title: "AI pracuje",
+                    body: "Generuje podpowiedz. Za chwile wynik pojawi sie w tym panelu.",
+                    status: "Przetwarzanie",
+                    show: overlayController.isVisible
+                )
+            }
+        }
     }
 
     private var overlaySection: some View {
@@ -74,6 +95,15 @@ struct ContentView: View {
                     overlayController.toggle()
                 }
                 .buttonStyle(.borderedProminent)
+
+                Button("Pokaz testowa tresc") {
+                    overlayController.updateContent(
+                        title: "Overlay testowy",
+                        body: "Ten panel powinien byc widoczny nad innymi aplikacjami. Teraz sprawdzamy, jak zachowuje sie przy udostepnianiu ekranu.",
+                        status: "Test overlayu"
+                    )
+                }
+                .buttonStyle(.bordered)
 
                 Text(overlayController.isVisible ? "Overlay jest widoczny" : "Overlay jest ukryty")
                     .foregroundStyle(.secondary)

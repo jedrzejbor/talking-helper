@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct OverlayView: View {
+    @ObservedObject var content: OverlayContentModel
     let onHide: () -> Void
 
     var body: some View {
@@ -23,16 +24,24 @@ struct OverlayView: View {
                     .controlSize(.small)
             }
 
-            Text("Overlay testowy")
+            Text(content.title)
                 .font(.title3.weight(.semibold))
 
-            Text("Ten panel powinien byc widoczny nad innymi aplikacjami. Teraz sprawdzamy, jak zachowuje sie przy udostepnianiu ekranu.")
-                .font(.body)
+            ScrollView {
+                Text(content.body)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 190)
+
+            Text(content.status)
+                .font(.caption)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .frame(width: 420, alignment: .leading)
+        .frame(width: 560, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)

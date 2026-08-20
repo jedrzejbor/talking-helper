@@ -12,6 +12,8 @@ import SwiftUI
 final class OverlayPanelController: ObservableObject {
     @Published private(set) var isVisible = false
 
+    let content = OverlayContentModel()
+
     private var panel: NSPanel?
 
     func toggle() {
@@ -32,8 +34,19 @@ final class OverlayPanelController: ObservableObject {
         isVisible = false
     }
 
+    func updateContent(title: String, body: String, status: String, show: Bool = true) {
+        content.title = title
+        content.body = Self.compact(body)
+        content.status = status
+
+        if show {
+            self.show()
+        }
+    }
+
     private func makePanel() -> NSPanel {
         let contentView = OverlayView(
+            content: content,
             onHide: { [weak self] in
                 self?.hide()
             }
@@ -41,7 +54,7 @@ final class OverlayPanelController: ObservableObject {
 
         let hostingController = NSHostingController(rootView: contentView)
         let panel = NSPanel(
-            contentRect: NSRect(x: 120, y: 160, width: 420, height: 180),
+            contentRect: NSRect(x: 120, y: 160, width: 560, height: 320),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -60,5 +73,16 @@ final class OverlayPanelController: ObservableObject {
         panel.titlebarAppearsTransparent = true
 
         return panel
+    }
+
+    private static func compact(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard trimmed.count > 1_200 else {
+            return trimmed
+        }
+
+        let endIndex = trimmed.index(trimmed.startIndex, offsetBy: 1_200)
+        return String(trimmed[..<endIndex]) + "\n..."
     }
 }
