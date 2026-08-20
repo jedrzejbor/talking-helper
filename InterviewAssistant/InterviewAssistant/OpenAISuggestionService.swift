@@ -20,9 +20,9 @@ final class OpenAISuggestionService: ObservableObject {
             case .idle:
                 "AI gotowe"
             case .loading:
-                "Generowanie odpowiedzi"
+                "AI pracuje"
             case .ready:
-                "Odpowiedz wygenerowana"
+                "Wynik gotowy"
             case .failed(let message):
                 "Blad AI: \(message)"
             }
@@ -60,7 +60,7 @@ final class OpenAISuggestionService: ObservableObject {
                 answer = try await Self.callResponsesAPI(
                     apiKey: trimmedKey,
                     model: trimmedModel,
-                    question: trimmedQuestion
+                    input: Self.answerPrompt(question: trimmedQuestion)
                 )
                 state = .ready
             } catch {
@@ -69,7 +69,44 @@ final class OpenAISuggestionService: ObservableObject {
         }
     }
 
-    nonisolated private static func callResponsesAPI(apiKey: String, model: String, question: String) async throws -> String {
+    func analyzeCode(apiKey: String, code: String, model: String) {
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedKey.isEmpty else {
+            state = .failed("brak klucza API")
+            return
+        }
+
+        guard !trimmedCode.isEmpty else {
+            state = .failed("najpierw przechwyc kod")
+            return
+        }
+
+        guard !trimmedModel.isEmpty else {
+            state = .failed("brak nazwy modelu")
+            return
+        }
+
+        state = .loading
+        answer = ""
+
+        Task {
+            do {
+                answer = try await Self.callResponsesAPI(
+                    apiKey: trimmedKey,
+                    model: trimmedModel,
+                    input: Self.codeAnalysisPrompt(code: trimmedCode)
+                )
+                state = .ready
+            } catch {
+                state = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    nonisolated private static func callResponsesAPI(apiKey: String, model: String, input: String) async throws -> String {
         guard let url = URL(string: "https://api.openai.com/v1/responses") else {
             throw OpenAIClientError.invalidURL
         }
@@ -82,13 +119,7 @@ final class OpenAISuggestionService: ObservableObject {
 
         let body = ResponsesRequest(
             model: model,
-            input: """
-            Jestes prywatnym asystentem podczas rozmowy rekrutacyjnej lub rozmowy z klientem.
-            Odpowiedz po polsku, konkretnie i naturalnie. Daj uzytkownikowi gotowa wypowiedz w 3-6 punktach lub krotkim akapicie.
-
-            Pytanie rozmowcy:
-            \(question)
-            """,
+            input: input,
             store: false
         )
 
@@ -115,6 +146,36 @@ final class OpenAISuggestionService: ObservableObject {
         }
 
         return text
+    }
+
+    nonisolated private static func answerPrompt(question: String) -> String {
+        """
+        Jestes prywatnym asystentem podczas rozmowy rekrutacyjnej lub rozmowy z klientem.
+        Odpowiedz po polsku, konkretnie i naturalnie. Daj uzytkownikowi gotowa wypowiedz w 3-6 punktach lub krotkim akapicie.
+
+        Pytanie rozmowcy:
+        \(question)
+        """
+    }
+
+    nonisolated private static func codeAnalysisPrompt(code: String) -> String {
+        """
+        Jestes prywatnym asystentem podczas live codingu na rozmowie technicznej.
+        Przeanalizuj ponizszy kod i odpowiedz po polsku.
+
+        Format odpowiedzi:
+        1. Co widze w kodzie: 2-4 krotkie punkty.
+        2. Potencjalny problem: konkret, bez zgadywania ponad dane z kodu.
+        3. Co zrobic dalej: kolejne kroki implementacji lub debugowania.
+        4. Jak to powiedziec na rozmowie: naturalna wypowiedz w 2-4 zdaniach.
+
+        Jesli kod jest niepelny albo OCR mogl znieksztalcic tekst, zaznacz to wprost.
+
+        Kod:
+        ```text
+        \(code)
+        ```
+        """
     }
 }
 

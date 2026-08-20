@@ -186,6 +186,19 @@ struct ContentView: View {
                 .buttonStyle(.bordered)
                 .disabled(codeCaptureService.state == .runningOCR)
 
+                Button("Analizuj kod") {
+                    suggestionService.analyzeCode(
+                        apiKey: apiKey,
+                        code: codeCaptureService.capturedText,
+                        model: modelName
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    suggestionService.state == .loading ||
+                    codeCaptureService.capturedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
+
                 Button("Wyczysc") {
                     codeCaptureService.clear()
                 }
