@@ -11,6 +11,7 @@ struct ContentView: View {
     @StateObject private var overlayController = OverlayPanelController()
     @StateObject private var hotkeyManager = HotkeyManager()
     @StateObject private var microphoneService = MicrophoneCaptureService()
+    @StateObject private var systemAudioService = SystemAudioCaptureService()
     @StateObject private var screenCaptureService = ScreenCaptureDiagnosticService()
     @StateObject private var codeCaptureService = CodeCaptureService()
     @StateObject private var suggestionService = OpenAISuggestionService()
@@ -35,6 +36,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 16) {
                 overlaySection
                 microphoneSection
+                systemAudioSection
                 screenCaptureSection
                 codeCaptureSection
                 aiSection
@@ -58,6 +60,7 @@ struct ContentView: View {
         }
         .onDisappear {
             microphoneService.stop()
+            systemAudioService.stop()
         }
         .onChange(of: suggestionService.answer) { _, answer in
             guard !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -139,6 +142,39 @@ struct ContentView: View {
             Text(String(format: "Poziom: %.1f dB", microphoneService.decibels))
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var systemAudioSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Audio systemowe")
+                .font(.headline)
+
+            Text("Ten test sprawdza, czy ScreenCaptureKit dostarcza dzwiek systemowy lub dzwiek aplikacji rozmowy.")
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Button(systemAudioService.state == .running ? "Zatrzymaj audio systemowe" : "Uruchom audio systemowe") {
+                    systemAudioService.toggle()
+                }
+                .buttonStyle(.bordered)
+
+                Text(systemAudioService.state.label)
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: systemAudioService.level)
+                .progressViewStyle(.linear)
+
+            Text(String(format: "Poziom: %.1f dB, probki: %d", systemAudioService.decibels, systemAudioService.sampleBufferCount))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            if systemAudioService.state == .permissionMissing {
+                Text("Wlacz InterviewAssistant w Nagrywanie ekranu i dzwieku systemowego, zamknij aplikacje i uruchom ja ponownie.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
