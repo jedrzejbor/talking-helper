@@ -178,7 +178,7 @@ final class AudioTranscriptionService: NSObject, ObservableObject {
             }
 
             do {
-                transcript = try await Self.transcribe(
+                transcript = try await OpenAIAudioTranscriptionClient.transcribe(
                     audioURL: recordingURL,
                     apiKey: apiKey,
                     model: model
@@ -206,76 +206,6 @@ final class AudioTranscriptionService: NSObject, ObservableObject {
         recordingSeconds = 0
     }
 
-    nonisolated private static func transcribe(audioURL: URL, apiKey: String, model: String) async throws -> String {
-        guard let endpoint = URL(string: "https://api.openai.com/v1/audio/transcriptions") else {
-            throw AudioTranscriptionError.invalidURL
-        }
-
-        let audioData = try Data(contentsOf: audioURL)
-        guard !audioData.isEmpty else {
-            throw AudioTranscriptionError.emptyRecording
-        }
-
-        let boundary = "Boundary-\(UUID().uuidString)"
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 60
-        request.httpBody = multipartBody(
-            boundary: boundary,
-            audioData: audioData,
-            model: model
-        )
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AudioTranscriptionError.invalidResponse
-        }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            let apiError = try? JSONDecoder().decode(TranscriptionErrorResponse.self, from: data)
-            throw AudioTranscriptionError.apiError(
-                status: httpResponse.statusCode,
-                message: apiError?.error.message ?? String(data: data, encoding: .utf8) ?? "brak tresci bledu"
-            )
-        }
-
-        let responseBody = try JSONDecoder().decode(TranscriptionResponse.self, from: data)
-        let text = responseBody.text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !text.isEmpty else {
-            throw AudioTranscriptionError.emptyTranscript
-        }
-
-        return text
-    }
-
-    nonisolated private static func multipartBody(
-        boundary: String,
-        audioData: Data,
-        model: String
-    ) -> Data {
-        var body = Data()
-
-        body.appendUTF8("--\(boundary)\r\n")
-        body.appendUTF8("Content-Disposition: form-data; name=\"model\"\r\n\r\n")
-        body.appendUTF8("\(model)\r\n")
-        body.appendUTF8("--\(boundary)\r\n")
-        body.appendUTF8("Content-Disposition: form-data; name=\"language\"\r\n\r\n")
-        body.appendUTF8("pl\r\n")
-        body.appendUTF8("--\(boundary)\r\n")
-        body.appendUTF8("Content-Disposition: form-data; name=\"response_format\"\r\n\r\n")
-        body.appendUTF8("json\r\n")
-        body.appendUTF8("--\(boundary)\r\n")
-        body.appendUTF8("Content-Disposition: form-data; name=\"file\"; filename=\"sample.m4a\"\r\n")
-        body.appendUTF8("Content-Type: audio/mp4\r\n\r\n")
-        body.append(audioData)
-        body.appendUTF8("\r\n--\(boundary)--\r\n")
-
-        return body
-    }
 }
 
 extension AudioTranscriptionService: AVAudioRecorderDelegate {
@@ -291,46 +221,13 @@ extension AudioTranscriptionService: AVAudioRecorderDelegate {
     }
 }
 
-private extension Data {
-    mutating func appendUTF8(_ text: String) {
-        append(Data(text.utf8))
-    }
-}
-
-private struct TranscriptionResponse: Decodable {
-    let text: String
-}
-
-private struct TranscriptionErrorResponse: Decodable {
-    let error: TranscriptionAPIError
-}
-
-private struct TranscriptionAPIError: Decodable {
-    let message: String
-}
-
 private enum AudioTranscriptionError: LocalizedError {
-    case invalidURL
-    case invalidResponse
     case recordingDidNotStart
-    case emptyRecording
-    case emptyTranscript
-    case apiError(status: Int, message: String)
 
     var errorDescription: String? {
         switch self {
-        case .invalidURL:
-            "niepoprawny URL API"
-        case .invalidResponse:
-            "niepoprawna odpowiedz HTTP"
         case .recordingDidNotStart:
             "nie udalo sie uruchomic nagrywania"
-        case .emptyRecording:
-            "nagrany plik audio jest pusty"
-        case .emptyTranscript:
-            "model nie zwrocil transkrypcji"
-        case .apiError(let status, let message):
-            "HTTP \(status): \(message)"
         }
     }
 }

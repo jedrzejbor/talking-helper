@@ -13,6 +13,7 @@ struct ContentView: View {
     @StateObject private var microphoneService = MicrophoneCaptureService()
     @StateObject private var systemAudioService = SystemAudioCaptureService()
     @StateObject private var transcriptionService = AudioTranscriptionService()
+    @StateObject private var systemAudioTranscriptionService = SystemAudioTranscriptionService()
     @StateObject private var screenCaptureService = ScreenCaptureDiagnosticService()
     @StateObject private var codeCaptureService = CodeCaptureService()
     @StateObject private var suggestionService = OpenAISuggestionService()
@@ -40,6 +41,7 @@ struct ContentView: View {
                     overlaySection
                     microphoneSection
                     systemAudioSection
+                    systemAudioTranscriptionSection
                     transcriptionSection
                     screenCaptureSection
                     codeCaptureSection
@@ -68,6 +70,7 @@ struct ContentView: View {
             microphoneService.stop()
             systemAudioService.stop()
             transcriptionService.cancel()
+            systemAudioTranscriptionService.cancel()
         }
         .onChange(of: suggestionService.answer) { _, answer in
             guard !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -97,9 +100,21 @@ struct ContentView: View {
 
             interviewQuestion = transcript
             overlayController.updateContent(
-                title: "Transkrypcja testowa",
+                title: "Ty - transkrypcja testowa",
                 body: transcript,
-                status: "Audio zamienione na tekst"
+                status: "Kanal mikrofonu"
+            )
+        }
+        .onChange(of: systemAudioTranscriptionService.transcript) { _, transcript in
+            guard !transcript.isEmpty else {
+                return
+            }
+
+            interviewQuestion = transcript
+            overlayController.updateContent(
+                title: "Rozmowca - pytanie",
+                body: transcript,
+                status: "Kanal audio systemowego"
             )
         }
     }
@@ -199,10 +214,10 @@ struct ContentView: View {
 
     private var transcriptionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Transkrypcja audio")
+            Text("Transkrypcja: Ty (mikrofon)")
                 .font(.headline)
 
-            Text("Nagraj do 10 sekund z mikrofonu. Po zatrzymaniu probka zostanie wyslana do OpenAI i wpisana jako pytanie rozmowcy.")
+            Text("Nagraj do 10 sekund z mikrofonu. Ten test sprawdza osobny kanal Twojego glosu.")
                 .foregroundStyle(.secondary)
 
             HStack {
@@ -226,12 +241,17 @@ struct ContentView: View {
                     .disabled(transcriptionService.isBusy)
                 }
 
+                Text(transcriptionService.state.label)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Text("Model")
+                    .foregroundStyle(.secondary)
+
                 TextField("Model transkrypcji", text: $transcriptionModelName)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
-
-                Text(transcriptionService.state.label)
-                    .foregroundStyle(.secondary)
             }
 
             if transcriptionService.state == .recording {
@@ -255,6 +275,92 @@ struct ContentView: View {
                     .textSelection(.enabled)
                     .padding(10)
                     .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+        }
+    }
+
+    private var systemAudioTranscriptionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Transkrypcja: Rozmowca (audio systemowe)")
+                .font(.headline)
+
+            Text("Odtworz pytanie w aplikacji rozmowy lub przegladarce i nagraj do 10 sekund. Dzwiek InterviewAssistant jest pomijany.")
+                .foregroundStyle(.secondary)
+
+            HStack {
+                if systemAudioTranscriptionService.state == .recording {
+                    Button("Zatrzymaj i transkrybuj") {
+                        systemAudioTranscriptionService.stopAndTranscribe(
+                            apiKey: apiKey,
+                            model: transcriptionModelName
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                } else {
+                    Button("Nagraj rozmowce") {
+                        microphoneService.stop()
+                        transcriptionService.cancel()
+                        systemAudioService.stop()
+                        systemAudioTranscriptionService.start(
+                            apiKey: apiKey,
+                            model: transcriptionModelName
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(systemAudioTranscriptionService.isBusy)
+                }
+
+                Text(systemAudioTranscriptionService.state.label)
+                    .foregroundStyle(.secondary)
+            }
+
+            if systemAudioTranscriptionService.state == .recording {
+                ProgressView(value: Double(systemAudioTranscriptionService.recordingSeconds), total: 10)
+                    .progressViewStyle(.linear)
+
+                Text(
+                    "Nagrywanie: \(systemAudioTranscriptionService.recordingSeconds) / 10 s, " +
+                    "bufory: \(systemAudioTranscriptionService.sampleBufferCount)"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            }
+
+            if let duration = systemAudioTranscriptionService.requestDuration {
+                Text(String(format: "Czas zatrzymania i odpowiedzi API: %.2f s", duration))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if systemAudioTranscriptionService.state == .permissionMissing {
+                HStack {
+                    Button("Otworz ustawienia") {
+                        PrivacySettingsOpener.openScreenCaptureSettings()
+                    }
+                    .buttonStyle(.bordered)
+
+                    Text("Wlacz InterviewAssistant w Nagrywanie ekranu i dzwieku systemowego, a potem uruchom aplikacje ponownie.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !systemAudioTranscriptionService.transcript.isEmpty {
+                Text(systemAudioTranscriptionService.transcript)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                    .padding(10)
+                    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                Button("Generuj odpowiedz") {
+                    suggestionService.generateAnswer(
+                        apiKey: apiKey,
+                        question: systemAudioTranscriptionService.transcript,
+                        model: modelName
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(suggestionService.state == .loading)
             }
         }
     }
