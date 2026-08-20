@@ -13,6 +13,11 @@ struct ContentView: View {
     @StateObject private var microphoneService = MicrophoneCaptureService()
     @StateObject private var screenCaptureService = ScreenCaptureDiagnosticService()
     @StateObject private var codeCaptureService = CodeCaptureService()
+    @StateObject private var suggestionService = OpenAISuggestionService()
+    @State private var apiKey = ""
+    @State private var modelName = "gpt-5.6"
+    @State private var interviewQuestion = ""
+    @State private var keyStatus = "Klucz API niezaladowany"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -32,10 +37,11 @@ struct ContentView: View {
                 microphoneSection
                 screenCaptureSection
                 codeCaptureSection
+                aiSection
             }
         }
         .padding(24)
-        .frame(minWidth: 680, minHeight: 720)
+        .frame(minWidth: 760, minHeight: 900)
         .onAppear {
             hotkeyManager.registerDefaultHotkeys(
                 toggleOverlay: {
@@ -48,6 +54,7 @@ struct ContentView: View {
                     codeCaptureService.captureCursorContext()
                 }
             )
+            loadAPIKey()
         }
         .onDisappear {
             microphoneService.stop()
@@ -213,6 +220,89 @@ struct ContentView: View {
                 .frame(height: 140)
                 .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
+        }
+    }
+
+    private var aiSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("OpenAI odpowiedz tekstowa")
+                .font(.headline)
+
+            Text("Ten test sprawdza generowanie odpowiedzi na pytanie rozmowcy przez Responses API.")
+                .foregroundStyle(.secondary)
+
+            HStack {
+                SecureField("OpenAI API key", text: $apiKey)
+                    .textFieldStyle(.roundedBorder)
+
+                Button("Zapisz klucz") {
+                    saveAPIKey()
+                }
+                .buttonStyle(.bordered)
+            }
+
+            HStack {
+                TextField("Model", text: $modelName)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+
+                Text(keyStatus)
+                    .foregroundStyle(.secondary)
+            }
+
+            TextEditor(text: $interviewQuestion)
+                .font(.body)
+                .frame(height: 90)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(.secondary.opacity(0.25), lineWidth: 1)
+                }
+
+            HStack {
+                Button("Generuj odpowiedz") {
+                    suggestionService.generateAnswer(
+                        apiKey: apiKey,
+                        question: interviewQuestion,
+                        model: modelName
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(suggestionService.state == .loading)
+
+                Text(suggestionService.state.label)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !suggestionService.answer.isEmpty {
+                ScrollView {
+                    Text(suggestionService.answer)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .padding(10)
+                }
+                .frame(height: 130)
+                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+        }
+    }
+
+    private func loadAPIKey() {
+        do {
+            if let savedKey = try KeychainService.read(account: "openai_api_key") {
+                apiKey = savedKey
+                keyStatus = "Klucz API zaladowany z Keychain"
+            }
+        } catch {
+            keyStatus = error.localizedDescription
+        }
+    }
+
+    private func saveAPIKey() {
+        do {
+            try KeychainService.save(apiKey, account: "openai_api_key")
+            keyStatus = "Klucz API zapisany w Keychain"
+        } catch {
+            keyStatus = error.localizedDescription
         }
     }
 }
