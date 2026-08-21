@@ -31,6 +31,7 @@ final class OpenAISuggestionService: ObservableObject {
 
     @Published private(set) var state: SuggestionState = .idle
     @Published private(set) var answer = ""
+    @Published private(set) var requestDuration: TimeInterval?
 
     func generateAnswer(apiKey: String, question: String, model: String) {
         let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -54,16 +55,21 @@ final class OpenAISuggestionService: ObservableObject {
 
         state = .loading
         answer = ""
+        requestDuration = nil
+        let startedAt = Date()
 
         Task {
             do {
-                answer = try await Self.callResponsesAPI(
+                let generatedAnswer = try await Self.callResponsesAPI(
                     apiKey: trimmedKey,
                     model: trimmedModel,
                     input: Self.answerPrompt(question: trimmedQuestion)
                 )
+                requestDuration = Date().timeIntervalSince(startedAt)
+                answer = generatedAnswer
                 state = .ready
             } catch {
+                requestDuration = Date().timeIntervalSince(startedAt)
                 state = .failed(error.localizedDescription)
             }
         }
@@ -91,16 +97,21 @@ final class OpenAISuggestionService: ObservableObject {
 
         state = .loading
         answer = ""
+        requestDuration = nil
+        let startedAt = Date()
 
         Task {
             do {
-                answer = try await Self.callResponsesAPI(
+                let generatedAnswer = try await Self.callResponsesAPI(
                     apiKey: trimmedKey,
                     model: trimmedModel,
                     input: Self.codeAnalysisPrompt(code: trimmedCode)
                 )
+                requestDuration = Date().timeIntervalSince(startedAt)
+                answer = generatedAnswer
                 state = .ready
             } catch {
+                requestDuration = Date().timeIntervalSince(startedAt)
                 state = .failed(error.localizedDescription)
             }
         }

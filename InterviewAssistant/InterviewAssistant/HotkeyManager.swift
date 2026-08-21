@@ -39,6 +39,7 @@ final class HotkeyManager: ObservableObject {
 
     func registerDefaultHotkeys(
         toggleOverlay: @escaping @MainActor () -> Void,
+        generateAnswer: @escaping @MainActor () -> Void,
         captureCode: @escaping @MainActor () -> Void,
         captureCursorContext: @escaping @MainActor () -> Void
     ) {
@@ -52,6 +53,14 @@ final class HotkeyManager: ObservableObject {
 
         registerHotkey(
             id: 2,
+            keyCode: UInt32(kVK_ANSI_A),
+            modifiers: UInt32(cmdKey | shiftKey),
+            label: "Cmd + Shift + A",
+            action: generateAnswer
+        )
+
+        registerHotkey(
+            id: 3,
             keyCode: UInt32(kVK_ANSI_C),
             modifiers: UInt32(cmdKey | shiftKey),
             label: "Cmd + Shift + C",
@@ -59,7 +68,7 @@ final class HotkeyManager: ObservableObject {
         )
 
         registerHotkey(
-            id: 3,
+            id: 4,
             keyCode: UInt32(kVK_ANSI_D),
             modifiers: UInt32(cmdKey | shiftKey),
             label: "Cmd + Shift + D",

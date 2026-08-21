@@ -22,6 +22,13 @@ struct ContentView: View {
     @State private var transcriptionModelName = "gpt-4o-mini-transcribe"
     @State private var interviewQuestion = ""
     @State private var keyStatus = "Klucz API niezaladowany"
+    @State private var automaticAnswerEnabled = true
+    @State private var automaticPipelineActive = false
+    @State private var captureStartedAt: Date?
+    @State private var processingStartedAt: Date?
+    @State private var processingToAnswerDuration: TimeInterval?
+    @State private var captureToAnswerDuration: TimeInterval?
+    @State private var pipelineAIRequestDuration: TimeInterval?
 
     var body: some View {
         ScrollView {
@@ -57,6 +64,9 @@ struct ContentView: View {
                 toggleOverlay: {
                     overlayController.toggle()
                 },
+                generateAnswer: {
+                    generateAnswerFromLatestQuestion()
+                },
                 captureCode: {
                     codeCaptureService.captureCode()
                 },
@@ -82,6 +92,18 @@ struct ContentView: View {
                 body: answer,
                 status: "Ostatnia odpowiedz AI"
             )
+
+            if automaticPipelineActive {
+                let completedAt = Date()
+                processingToAnswerDuration = processingStartedAt.map {
+                    completedAt.timeIntervalSince($0)
+                }
+                captureToAnswerDuration = captureStartedAt.map {
+                    completedAt.timeIntervalSince($0)
+                }
+                pipelineAIRequestDuration = suggestionService.requestDuration
+                automaticPipelineActive = false
+            }
         }
         .onChange(of: suggestionService.state) { _, state in
             if state == .loading {
@@ -91,6 +113,15 @@ struct ContentView: View {
                     status: "Przetwarzanie",
                     show: overlayController.isVisible
                 )
+            }
+
+            if case .failed(let message) = state, automaticPipelineActive {
+                overlayController.updateContent(
+                    title: "Nie udalo sie wygenerowac odpowiedzi",
+                    body: message,
+                    status: "Blad AI"
+                )
+                automaticPipelineActive = false
             }
         }
         .onChange(of: transcriptionService.transcript) { _, transcript in
@@ -116,6 +147,32 @@ struct ContentView: View {
                 body: transcript,
                 status: "Kanal audio systemowego"
             )
+
+            if automaticPipelineActive, automaticAnswerEnabled {
+                suggestionService.generateAnswer(
+                    apiKey: apiKey,
+                    question: transcript,
+                    model: modelName
+                )
+            } else {
+                automaticPipelineActive = false
+            }
+        }
+        .onChange(of: systemAudioTranscriptionService.state) { _, state in
+            switch state {
+            case .recording:
+                if automaticPipelineActive {
+                    captureStartedAt = Date()
+                }
+            case .uploading:
+                if automaticPipelineActive {
+                    processingStartedAt = Date()
+                }
+            case .failed, .permissionMissing:
+                automaticPipelineActive = false
+            default:
+                break
+            }
         }
     }
 
@@ -287,6 +344,9 @@ struct ContentView: View {
             Text("Odtworz pytanie w aplikacji rozmowy lub przegladarce i nagraj do 10 sekund. Dzwiek InterviewAssistant jest pomijany.")
                 .foregroundStyle(.secondary)
 
+            Toggle("Automatycznie generuj odpowiedz po transkrypcji", isOn: $automaticAnswerEnabled)
+                .toggleStyle(.switch)
+
             HStack {
                 if systemAudioTranscriptionService.state == .recording {
                     Button("Zatrzymaj i transkrybuj") {
@@ -297,14 +357,8 @@ struct ContentView: View {
                     }
                     .buttonStyle(.borderedProminent)
                 } else {
-                    Button("Nagraj rozmowce") {
-                        microphoneService.stop()
-                        transcriptionService.cancel()
-                        systemAudioService.stop()
-                        systemAudioTranscriptionService.start(
-                            apiKey: apiKey,
-                            model: transcriptionModelName
-                        )
+                    Button(automaticAnswerEnabled ? "Nagraj pytanie i przygotuj odpowiedz" : "Nagraj rozmowce") {
+                        startQuestionCapture()
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(systemAudioTranscriptionService.isBusy)
@@ -327,7 +381,24 @@ struct ContentView: View {
             }
 
             if let duration = systemAudioTranscriptionService.requestDuration {
-                Text(String(format: "Czas zatrzymania i odpowiedzi API: %.2f s", duration))
+                Text(String(format: "Czas transkrypcji po zatrzymaniu: %.2f s", duration))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let duration = pipelineAIRequestDuration {
+                Text(String(format: "Czas generowania odpowiedzi AI: %.2f s", duration))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let duration = processingToAnswerDuration {
+                Text(String(format: "Od zatrzymania nagrania do odpowiedzi: %.2f s", duration))
+                    .font(.callout.weight(.medium))
+            }
+
+            if let duration = captureToAnswerDuration {
+                Text(String(format: "Pelny przebieg od startu nagrania: %.2f s", duration))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -353,15 +424,15 @@ struct ContentView: View {
                     .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 Button("Generuj odpowiedz") {
-                    suggestionService.generateAnswer(
-                        apiKey: apiKey,
-                        question: systemAudioTranscriptionService.transcript,
-                        model: modelName
-                    )
+                    generateAnswerFromLatestQuestion()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(suggestionService.state == .loading)
             }
+
+            Text("Cmd + Shift + A generuje ponownie odpowiedz na ostatnie rozpoznane pytanie.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -570,5 +641,35 @@ struct ContentView: View {
         } catch {
             keyStatus = error.localizedDescription
         }
+    }
+
+    private func startQuestionCapture() {
+        microphoneService.stop()
+        transcriptionService.cancel()
+        systemAudioService.stop()
+
+        automaticPipelineActive = automaticAnswerEnabled
+        captureStartedAt = nil
+        processingStartedAt = nil
+        processingToAnswerDuration = nil
+        captureToAnswerDuration = nil
+        pipelineAIRequestDuration = nil
+
+        systemAudioTranscriptionService.start(
+            apiKey: apiKey,
+            model: transcriptionModelName
+        )
+    }
+
+    private func generateAnswerFromLatestQuestion() {
+        guard suggestionService.state != .loading else {
+            return
+        }
+
+        suggestionService.generateAnswer(
+            apiKey: apiKey,
+            question: interviewQuestion,
+            model: modelName
+        )
     }
 }
